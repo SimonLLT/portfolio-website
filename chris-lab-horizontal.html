@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Project Timeline — Horizontal Scroll</title>
+  <style>
+    :root {
+      --bg: #0c0c0c;
+      --fg: #f2f0e9;
+      --muted: #9c968b;
+      --line: rgba(242,240,233,0.12);
+      --purple: #a855f7;
+      --purple-light: #c084fc;
+      --purple-dark: #7e22ce;
+      --purple-pale: #d8b4fe;
+      --indigo: #6366f1;
+      --coral: #c44536;
+      --teal: #00d4aa;
+      --amber: #f59e0b;
+      --ease: cubic-bezier(0.16,1,0.3,1);
+    }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    html, body {
+      width:100%; height:100%;
+      background:var(--bg);
+      color:var(--fg);
+      font-family:"Helvetica Neue",Arial,"PingFang SC","Microsoft YaHei",sans-serif;
+      -webkit-font-smoothing:antialiased;
+      overflow:hidden;
+      user-select:none;
+    }
+
+    /* ===== FIXED TOP NAV ===== */
+    .top-nav {
+      position:fixed; top:0; left:0; right:0; z-index:100;
+      display:flex; justify-content:space-between; align-items:center;
+      padding:1.4rem 2.4rem;
+      pointer-events:none;
+    }
+    .nav-links { display:flex; gap:2rem; pointer-events:auto; }
+    .nav-links a {
+      color:var(--muted); text-decoration:none; font-size:0.82rem;
+      font-weight:500; letter-spacing:0.03em; transition:color 0.25s;
+    }
+    .nav-links a:hover { color:var(--fg); }
+    .nav-cta {
+      pointer-events:auto;
+      padding:0.55rem 1.4rem; border-radius:100px;
+      background:rgba(168,85,247,0.15);
+      border:1px solid rgba(168,85,247,0.3);
+      color:var(--purple-light); font-size:0.78rem; font-weight:600;
+      letter-spacing:0.03em; cursor:pointer; transition:all 0.25s;
+    }
+    .nav-cta:hover { background:rgba(168,85,247,0.25); border-color:var(--purple); }
+
+    /* ===== FIXED BOTTOM MARQUEE ===== */
+    .marquee-bar {
+      position:fixed; bottom:0; left:0; right:0; z-index:100;
+      height:44px; overflow:hidden;
+      background:rgba(12,12,12,0.85);
+      backdrop-filter:blur(8px);
+      border-top:1px solid var(--line);
+      display:flex; align-items:center;
+    }
+    .marquee-track {
+      display:flex; gap:3rem;
+      animation:marqueeScroll 20s linear infinite;
+      white-space:nowrap;
+    }
+    @keyframes marqueeScroll {
+      0% { transform:translateX(0); }
+      100% { transform:translateX(-50%); }
+    }
+    .marquee-item {
+      font-size:0.75rem; color:var(--muted);
+      letter-spacing:0.06em; font-weight:500;
+    }
+    .marquee-item.dot { color:var(--purple); }
+
+    /* ===== MAIN HORIZONTAL SCROLL CONTAINER ===== */
+    .scroll-track {
+      position:fixed; inset:0;
+      display:flex; flex-wrap:nowrap;
+      overflow-x:auto; overflow-y:hidden;
+      scroll-behavior:smooth;
+      -webkit-overflow-scrolling:touch;
+      cursor:grab;
+      scrollbar-width:none;
+    }
+    .scroll-track::-webkit-scrollbar { display:none; }
+    .scroll-track.dragging { cursor:grabbing; scroll-behavior:auto; }
+
+    /* ===== HERO PANEL ===== */
+    .hero-panel {
+      flex:0 0 48vw; min-width:540px; height:100vh;
+      position:relative; display:flex; align-items:center;
+      padding:0 5vw 0 4vw;
+      background:radial-gradient(ellipse 80% 70% at 35% 55%, rgba(168,85,247,0.06) 0%, transparent 70%);
+    }
+
+    /* Geometric blocks behind person */
+    .geo-stage {
+      position:absolute; left:8%; bottom:16%; width:340px; height:380px;
+    }
+    .geo-block {
+      position:absolute; border-radius:6px;
+      transition:transform 0.4s var(--ease);
+    }
+    .geo-b1 { /* large left block */
+      width:140px; height:120px; left:0; bottom:20px;
+      background:linear-gradient(135deg,var(--purple),var(--purple-dark));
+      opacity:0.7;
+    }
+    .geo-b2 { /* tall right block */
+      width:100px; height:180px; right:40px; bottom:0;
+      background:linear-gradient(180deg,var(--indigo),var(--purple-dark));
+      opacity:0.6;
+    }
+    .geo-b3 { /* small accent */
+      width:80px; height:80px; left:100px; top:40px;
+      background:linear-gradient(135deg,var(--coral),var(--amber));
+      opacity:0.5; border-radius:50%;
+    }
+    .geo-b4 { /* flat wide */
+      width:180px; height:50px; left:130px; bottom:80px;
+      background:linear-gradient(90deg,var(--teal),var(--purple-light));
+      opacity:0.5; border-radius:3px;
+    }
+    .geo-b5 { /* top accent */
+      width:60px; height:100px; right:10px; top:70px;
+      background:linear-gradient(180deg,var(--purple-pale),var(--purple));
+      opacity:0.45; border-radius:4px;
+    }
+
+    /* Halftone overlay */
+    .halftone {
+      position:absolute; pointer-events:none;
+      background-image:radial-gradient(circle, rgba(168,85,247,0.12) 1px, transparent 1px);
+      background-size:14px 14px;
+      border-radius:6px;
+    }
+    .halftone-b1 { width:140px; height:120px; left:0; bottom:20px; border-radius:6px; }
+    .halftone-b2 { width:100px; height:180px; right:40px; bottom:0; border-radius:4px; }
+
+    /* Person silhouette */
+    .walker {
+      position:absolute; bottom:148px; left:62px;
+      width:44px; height:96px;
+      filter:drop-shadow(0 0 24px rgba(168,85,247,0.7))
+             drop-shadow(0 8px 16px rgba(0,0,0,0.5));
+      transition:left 0.06s linear;
+    }
+    .walker-body { width:100%; height:100%; position:relative; }
+    .w-head {
+      position:absolute; top:0; left:50%; transform:translateX(-50%);
+      width:24px; height:24px; background:var(--purple-light); border-radius:50%;
+    }
+    .w-torso {
+      position:absolute; top:22px; left:50%; transform:translateX(-50%);
+      width:28px; height:40px;
+      background:linear-gradient(180deg,var(--purple),var(--purple-dark));
+      border-radius:5px 5px 2px 2px;
+    }
+    .w-leg {
+      position:absolute; bottom:2px; width:9px; height:28px;
+      background:var(--purple-dark); border-radius:0 0 3px 3px;
+    }
+    .w-leg-l { left:9px; }
+    .w-leg-r { right:9px; }
+
+    /* Hero text */
+    .hero-text { position:relative; z-index:2; margin-left:auto; margin-right:2vw; }
+    .hero-eyebrow {
+      font-size:0.72rem; color:var(--purple-light); letter-spacing:0.12em;
+      font-weight:600; margin-bottom:0.8rem;
+    }
+    .hero-name {
+      font-size:4.5rem; font-weight:800; line-height:1;
+      background:linear-gradient(135deg,var(--fg),var(--purple-pale));
+      -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+      background-clip:text;
+    }
+    .hero-sub {
+      font-size:1.1rem; color:var(--muted); margin-top:1rem;
+      letter-spacing:0.02em;
+    }
+    .hero-stats {
+      display:flex; gap:2rem; margin-top:2.5rem;
+    }
+    .hero-stat h4 {
+      font-size:1.8rem; font-weight:700; color:var(--purple-light);
+    }
+    .hero-stat p {
+      font-size:0.72rem; color:var(--muted); letter-spacing:0.04em; margin-top:0.25rem;
+    }
+
+    /* Scroll hint */
+    .scroll-hint {
+      position:absolute; bottom:4rem; right:2rem;
+      display:flex; align-items:center; gap:0.6rem;
+      color:var(--muted); font-size:0.72rem; letter-spacing:0.06em;
+      animation:hintPulse 2s ease-in-out infinite;
+    }
+    .scroll-hint svg { width:20px; height:20px; stroke:var(--muted); }
+    @keyframes hintPulse {
+      0%,100% { opacity:0.5; }
+      50% { opacity:1; }
+    }
+
+    /* ===== TIMELINE PANEL ===== */
+    .timeline-panel {
+      flex:0 0 auto;
+      height:100vh;
+      display:flex; align-items:center;
+      padding:0 6vw 0 2vw;
+      position:relative;
+    }
+
+    .timeline-wrap {
+      display:flex; align-items:center; gap:0;
+      position:relative;
+    }
+
+    /* Horizontal line */
+    .tl-line {
+      position:absolute; left:0; right:0; top:50%;
+      height:2px; background:var(--line);
+      transform:translateY(-50%);
+    }
+
+    /* Year node */
+    .tl-year {
+      flex:0 0 auto; width:180px; text-align:center;
+      position:relative; z-index:2;
+    }
+    .tl-year-dot {
+      width:14px; height:14px; border-radius:50%;
+      background:var(--purple); margin:0 auto 0.8rem;
+      box-shadow:0 0 16px rgba(168,85,247,0.6);
+    }
+    .tl-year-label {
+      font-size:2rem; font-weight:800; color:var(--purple-light);
+      letter-spacing:0.04em;
+    }
+    .tl-year-sub {
+      font-size:0.68rem; color:var(--muted); margin-top:0.3rem; letter-spacing:0.06em;
+    }
+
+    /* Project card wrapper (alternating) */
+    .tl-card-wrap {
+      flex:0 0 auto; width:340px; padding:0 1.2rem;
+      position:relative; z-index:2;
+    }
+    .tl-card-wrap.top { margin-bottom:120px; }
+    .tl-card-wrap.bottom { margin-top:120px; }
+
+    /* Connector dot */
+    .tl-connector {
+      position:absolute; left:50%; width:10px; height:10px;
+      border-radius:50%; background:var(--purple);
+      box-shadow:0 0 12px rgba(168,85,247,0.5);
+      transform:translateX(-50%);
+      z-index:3;
+    }
+    .tl-card-wrap.top .tl-connector { bottom:-61px; }
+    .tl-card-wrap.bottom .tl-connector { top:-61px; }
+
+    /* Connector line from center to card */
+    .tl-conn-line {
+      position:absolute; left:50%; transform:translateX(-50%);
+      width:1px; background:var(--line);
+      z-index:1;
+    }
+    .tl-card-wrap.top .tl-conn-line { bottom:-5px; height:56px; }
+    .tl-card-wrap.bottom .tl-conn-line { top:-5px; height:56px; }
+
+    /* Card */
+    .tl-card {
+      background:rgba(255,255,255,0.03);
+      border:1px solid var(--line);
+      border-radius:12px; padding:1.5rem;
+      transition:all 0.35s var(--ease);
+      position:relative; overflow:hidden;
+    }
+    .tl-card:hover {
+      background:rgba(255,255,255,0.05);
+      border-color:rgba(168,85,247,0.3);
+      transform:translateY(-4px);
+      box-shadow:0 12px 40px rgba(0,0,0,0.4), 0 0 0 1px rgba(168,85,247,0.1);
+    }
+    .tl-card-num {
+      font-size:3.5rem; font-weight:900; line-height:1;
+      color:rgba(168,85,247,0.18);
+      position:absolute; top:0.5rem; right:1rem;
+      letter-spacing:-0.03em;
+    }
+    .tl-card-tag {
+      display:inline-flex; padding:0.2rem 0.7rem; border-radius:100px;
+      font-size:0.68rem; font-weight:600; letter-spacing:0.04em;
+      margin-bottom:0.8rem;
+    }
+    .tag-design { background:rgba(168,85,247,0.15); color:var(--purple-light); }
+    .tag-dashboard { background:rgba(99,102,241,0.15); color:#a5b4fc; }
+    .tag-stack { background:rgba(245,158,11,0.12); color:#fbbf24; }
+    .tag-report { background:rgba(0,212,170,0.12); color:var(--teal); }
+
+    .tl-card-title {
+      font-size:1.3rem; font-weight:700; line-height:1.3;
+      margin-bottom:0.6rem;
+    }
+    .tl-card-desc {
+      font-size:0.8rem; color:var(--muted); line-height:1.5;
+      display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+      overflow:hidden;
+    }
+    .tl-card-meta {
+      display:flex; justify-content:space-between; align-items:center;
+      margin-top:1rem; padding-top:0.8rem;
+      border-top:1px solid var(--line);
+    }
+    .tl-card-year {
+      font-size:0.72rem; color:var(--muted); letter-spacing:0.04em;
+    }
+    .tl-card-amount {
+      font-size:0.9rem; font-weight:700; color:var(--purple-light);
+    }
+
+    /* Year spacer */
+    .tl-spacer {
+      flex:0 0 auto; width:60px;
+    }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width:768px) {
+      .hero-panel { flex:0 0 85vw; min-width:320px; padding:0 1.5rem; }
+      .hero-name { font-size:3rem; }
+      .tl-card-wrap { width:280px; }
+      .tl-year { width:120px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Fixed Top Nav -->
+  <nav class="top-nav">
+    <div class="nav-links">
+      <a href="#">首页</a>
+      <a href="#">项目</a>
+      <a href="#">数据</a>
+      <a href="#">联系</a>
+    </div>
+    <div class="nav-cta">开始合作</div>
+  </nav>
+
+  <!-- Fixed Bottom Marquee -->
+  <div class="marquee-bar">
+    <div class="marquee-track">
+      <span class="marquee-item">DESIGNING</span><span class="marquee-item dot">·</span>
+      <span class="marquee-item">BETTER</span><span class="marquee-item dot">·</span>
+      <span class="marquee-item">EXPERIENCES</span><span class="marquee-item dot">·</span>
+      <span class="marquee-item">WITH</span><span class="marquee-item dot">·</span>
+      <span class="marquee-item">AI</span><span class="marquee-item dot">·</span>
+      <span class="marquee-item">DESIGNING</span><span class="marquee-item dot">·</span>
+      <span class="marquee-item">BETTER</span><span class="marquee-item dot">·</span>
+      <span class="marquee-item">EXPERIENCES</span><span class="marquee-item dot">·</span>
+      <span class="marquee-item">WITH</span><span class="marquee-item dot">·</span>
+      <span class="marquee-item">AI</span><span class="marquee-item dot">·</span>
+    </div>
+  </div>
+
+  <!-- Main Horizontal Scroll Track -->
+  <div class="scroll-track" id="scrollTrack">
+
+    <!-- ===== HERO PANEL ===== -->
+    <div class="hero-panel">
+      <div class="geo-stage">
+        <!-- Halftone dots -->
+        <div class="halftone halftone-b1"></div>
+        <div class="halftone halftone-b2"></div>
+        <!-- Colored blocks -->
+        <div class="geo-block geo-b1"></div>
+        <div class="geo-block geo-b2"></div>
+        <div class="geo-block geo-b3"></div>
+        <div class="geo-block geo-b4"></div>
+        <div class="geo-block geo-b5"></div>
+        <!-- Walker -->
+        <div class="walker" id="walker">
+          <div class="walker-body">
+            <div class="w-head"></div>
+            <div class="w-torso"></div>
+            <div class="w-leg w-leg-l"></div>
+            <div class="w-leg w-leg-r"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-text">
+        <div class="hero-eyebrow">PROJECT · REVIEW · 2026</div>
+        <h1 class="hero-name">项目<br>复盘</h1>
+        <p class="hero-sub">聚焦设计逻辑，而非单一节点<br>注重成果转化与应用落地</p>
+        <div class="hero-stats">
+          <div class="hero-stat"><h4>4</h4><p>年度项目</p></div>
+          <div class="hero-stat"><h4>¥460w</h4><p>累计款项</p></div>
+          <div class="hero-stat"><h4>10</h4><p>复盘维度</p></div>
+        </div>
+      </div>
+
+      <div class="scroll-hint">
+        <span>Scroll / Drag to Explore</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 12h14M12 5l7 7-7 7"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- ===== TIMELINE PANEL ===== -->
+    <div class="timeline-panel">
+      <div class="timeline-wrap">
+
+        <!-- Year 2023 -->
+        <div class="tl-year">
+          <div class="tl-year-dot" style="background:var(--purple); box-shadow:0 0 20px rgba(168,85,247,0.7);"></div>
+          <div class="tl-year-label">2023</div>
+          <div class="tl-year-sub">项目启动</div>
+        </div>
+
+        <!-- Project 01 — top -->
+        <div class="tl-card-wrap top">
+          <div class="tl-conn-line"></div>
+          <div class="tl-connector" style="background:var(--coral); box-shadow:0 0 14px rgba(196,69,54,0.6);"></div>
+          <div class="tl-card">
+            <div class="tl-card-num">01</div>
+            <div class="tl-card-tag tag-design">室内设计</div>
+            <div class="tl-card-title">江门绿城·潮闻东方</div>
+            <div class="tl-card-desc">项目周期冗长，二期示范区顺利落地后，甲方延后付款，取消后续精装交付内容，合同终止。</div>
+            <div class="tl-card-meta">
+              <span class="tl-card-year">2023 - 2025</span>
+              <span class="tl-card-amount">¥84.6万</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Project 02 — bottom -->
+        <div class="tl-card-wrap bottom" style="margin-left:40px;">
+          <div class="tl-conn-line"></div>
+          <div class="tl-connector" style="background:var(--indigo); box-shadow:0 0 14px rgba(99,102,241,0.6);"></div>
+          <div class="tl-card">
+            <div class="tl-card-num">02</div>
+            <div class="tl-card-tag tag-dashboard">室内设计</div>
+            <div class="tl-card-title">深圳盛瀚·臻悦瑞府</div>
+            <div class="tl-card-desc">深化方案汇报完成，方案确认前甲方反馈待定；后续跟进反馈滞后，项目资金断裂，目前诉讼中。</div>
+            <div class="tl-card-meta">
+              <span class="tl-card-year">2024 - 2025</span>
+              <span class="tl-card-amount">¥111.6万</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Year 2024 -->
+        <div class="tl-year" style="margin-left:40px;">
+          <div class="tl-year-dot"></div>
+          <div class="tl-year-label">2024</div>
+          <div class="tl-year-sub">持续交付</div>
+        </div>
+
+        <!-- Spacer -->
+        <div class="tl-spacer"></div>
+
+        <!-- Project 03 — top -->
+        <div class="tl-card-wrap top">
+          <div class="tl-conn-line"></div>
+          <div class="tl-connector" style="background:var(--amber); box-shadow:0 0 14px rgba(245,158,11,0.6);"></div>
+          <div class="tl-card">
+            <div class="tl-card-num">03</div>
+            <div class="tl-card-tag tag-stack">室内设计</div>
+            <div class="tl-card-title">哈尔滨鲁商·龙悦居二期</div>
+            <div class="tl-card-desc">项目合同待签，已签委托函；深化方案推敲完成，甲方失联，项目暂停7个月。</div>
+            <div class="tl-card-meta">
+              <span class="tl-card-year">2024 - 2026</span>
+              <span class="tl-card-amount">¥175.2万</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Project 04 — bottom -->
+        <div class="tl-card-wrap bottom" style="margin-left:40px;">
+          <div class="tl-conn-line"></div>
+          <div class="tl-connector" style="background:var(--teal); box-shadow:0 0 14px rgba(0,212,170,0.6);"></div>
+          <div class="tl-card">
+            <div class="tl-card-num">04</div>
+            <div class="tl-card-tag tag-report">室内设计</div>
+            <div class="tl-card-title">昆明中信·信悦里</div>
+            <div class="tl-card-desc">2024年10月中标，26年3月完成示范区施工图及大区深化阶段，甲方开发贷迟迟未落实，项目暂停。</div>
+            <div class="tl-card-meta">
+              <span class="tl-card-year">2024 - 2026</span>
+              <span class="tl-card-amount">¥88.7万</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Year 2025 -->
+        <div class="tl-year" style="margin-left:40px;">
+          <div class="tl-year-dot"></div>
+          <div class="tl-year-label">2025</div>
+          <div class="tl-year-sub">复盘优化</div>
+        </div>
+
+        <!-- Year 2026 -->
+        <div class="tl-year" style="margin-left:40px;">
+          <div class="tl-year-dot"></div>
+          <div class="tl-year-label">2026</div>
+          <div class="tl-year-sub">继续前行</div>
+        </div>
+
+        <!-- Summary card — top -->
+        <div class="tl-card-wrap top" style="margin-left:40px;">
+          <div class="tl-conn-line"></div>
+          <div class="tl-connector" style="background:var(--amber); box-shadow:0 0 18px rgba(245,158,11,0.8);"></div>
+          <div class="tl-card" style="border-color:rgba(245,158,11,0.25);">
+            <div class="tl-card-num" style="color:rgba(245,158,11,0.18);">∑</div>
+            <div class="tl-card-tag tag-stack">汇总</div>
+            <div class="tl-card-title" style="font-size:1.1rem;">累计需跟进款项</div>
+            <div class="tl-card-desc">84.6 + 111.6 + 175.2 + 88.7</div>
+            <div class="tl-card-meta">
+              <span class="tl-card-year">¥ 4,601,000</span>
+              <span class="tl-card-amount" style="font-size:1.2rem; color:var(--amber);">¥460.1万</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* ===== WALKER FOLLOWS SCROLL ===== */
+    (function(){
+      var track = document.getElementById('scrollTrack');
+      var walker = document.getElementById('walker');
+      if (!track || !walker) return;
+
+      var trackWidth, heroWidth, timelineStart;
+      var walkerStartPx = 62;   // initial left position in geo-stage
+      var walkerEndPx = 580;    // final right position (walks off blocks)
+      var isDragging = false, startX, scrollLeft;
+
+      function recalc() {
+        trackWidth = track.scrollWidth - track.clientWidth;
+        var heroPanel = track.querySelector('.hero-panel');
+        heroWidth = heroPanel ? heroPanel.offsetWidth : 540;
+        timelineStart = heroWidth;
+      }
+
+      recalc();
+      window.addEventListener('resize', recalc);
+
+      function updateWalker() {
+        var scrollX = track.scrollLeft;
+        // Map scroll [0, timelineStart] → walker position [startPx, endPx]
+        var progress = Math.min(Math.max(scrollX / timelineStart, 0), 1);
+        var eased = progress * progress * (3 - 2 * progress); // smoothstep
+        var pos = walkerStartPx + (walkerEndPx - walkerStartPx) * eased;
+        walker.style.left = pos + 'px';
+
+        // Leg animation speed based on scroll
+        if (progress > 0.05 && progress < 0.95) {
+          walker.classList.add('moving');
+        } else {
+          walker.classList.remove('moving');
+        }
+      }
+
+      track.addEventListener('scroll', updateWalker, {passive:true});
+
+      /* Drag to scroll */
+      track.addEventListener('mousedown', function(e){
+        isDragging = true;
+        track.classList.add('dragging');
+        startX = e.pageX - track.offsetLeft;
+        scrollLeft = track.scrollLeft;
+      });
+
+      track.addEventListener('mousemove', function(e){
+        if (!isDragging) return;
+        e.preventDefault();
+        var x = e.pageX - track.offsetLeft;
+        var walk = (x - startX) * 2;
+        track.scrollLeft = scrollLeft - walk;
+      });
+
+      var stopDrag = function(){
+        isDragging = false;
+        track.classList.remove('dragging');
+      };
+      track.addEventListener('mouseup', stopDrag);
+      track.addEventListener('mouseleave', stopDrag);
+
+      /* Wheel → horizontal scroll */
+      track.addEventListener('wheel', function(e){
+        e.preventDefault();
+        track.scrollLeft += e.deltaY;
+      }, {passive:false});
+
+      /* Initial */
+      updateWalker();
+    })();
+  </script>
+</body>
+</html>
